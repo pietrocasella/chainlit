@@ -3,7 +3,8 @@ import { Box } from '@mui/material';
 // import { useRecoilValue } from 'recoil';
 // import { tokenCountState } from 'state/chat';
 import StopButton from '../stopButton';
-import Input from './input';
+// import Input from './input';
+import RichInput from './richInput';
 import WaterMark from './waterMark';
 
 interface Props {
@@ -30,7 +31,8 @@ export default function InputBox({ onSubmit, onReply }: Props) {
     >
       <StopButton />
       <Box>
-        <Input onSubmit={onSubmit} onReply={onReply} />
+        <RichInput onSubmit={onSubmit} onReply={onReply} />
+        {/* <Input onSubmit={onSubmit} onReply={onReply} /> */}
         {/* {tokenCount > 0 && ( */}
         {/* <Stack flexDirection="row" alignItems="center">
           <Typography
