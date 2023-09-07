@@ -15,6 +15,7 @@ export interface MentionEntryComponentProps {
   mention: IMention;
   isFocused: boolean;
   searchValue?: string;
+  selectMention: (mention: IMention) => void;
 }
 
 function MentionEntry(props: MentionEntryComponentProps): ReactElement {
@@ -23,6 +24,7 @@ function MentionEntry(props: MentionEntryComponentProps): ReactElement {
     theme,
     searchValue, // eslint-disable-line @typescript-eslint/no-unused-vars
     isFocused, // eslint-disable-line @typescript-eslint/no-unused-vars
+    selectMention,
     ...parentProps
   } = props;
 
@@ -36,7 +38,6 @@ function MentionEntry(props: MentionEntryComponentProps): ReactElement {
             role="presentation"
           />
         </div>
-
         <div className={theme?.mentionSuggestionsEntryContainerRight}>
           <div className={theme?.mentionSuggestionsEntryText}>
             {mention.name}

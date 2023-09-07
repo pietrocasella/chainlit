@@ -2,9 +2,22 @@ import Editor from '@draft-js-plugins/editor';
 import createMentionPlugin, {
   defaultSuggestionsFilter
 } from '@draft-js-plugins/mention';
-import { EditorState, RichUtils } from 'draft-js';
+import {
+  ContentState,
+  EditorState,
+  RichUtils,
+  SelectionState,
+  getDefaultKeyBinding
+} from 'draft-js';
 import { useColors } from 'helpers/color';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  KeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import { useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
 
 import SendIcon from '@mui/icons-material/Telegram';
@@ -34,36 +47,28 @@ interface Props {
   onReply: (message: string) => void;
 }
 
-function useCustomStyleMap() {
-  const colors = useColors(true);
+// function useCustomStyleMap() {
+//   const colors = useColors(true);
 
-  const customStyleMap: Record<string, Record<string, string>> = {};
+//   const customStyleMap: Record<string, Record<string, string>> = {};
 
-  for (let i = 0; i < colors.length; i++) {
-    customStyleMap[i.toString()] = {
-      background: colors[i],
-      borderRadius: '2px',
-      cursor: 'pointer',
-      color: 'red'
-    };
-  }
+//   for (let i = 0; i < colors.length; i++) {
+//     customStyleMap[i.toString()] = {
+//       background: colors[i],
+//       borderRadius: '2px',
+//       cursor: 'pointer',
+//       color: 'red'
+//     };
+//   }
 
-  return customStyleMap;
-}
-function getLineCount(el: HTMLDivElement) {
-  const textarea = el.querySelector('textarea');
-  if (!textarea) {
-    return 0;
-  }
-  const lines = textarea.value.split('\n');
-  return lines.length;
-}
+//   return customStyleMap;
+// }
 
 const Input = ({ onSubmit, onReply }: Props) => {
   const [editorState, setEditorState] = useState(() =>
     EditorState.createEmpty()
   );
-  const customStyleMap = useCustomStyleMap();
+  // const customStyleMap = useCustomStyleMap();
   const ref = useRef<HTMLDivElement>(null);
   const setChatHistory = useSetRecoilState(chatHistoryState);
   const [chatSettings, setChatSettings] = useRecoilState(chatSettingsState);
@@ -107,34 +112,82 @@ const Input = ({ onSubmit, onReply }: Props) => {
     setIsComposing(false);
   };
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        if (!isComposing) {
-          e.preventDefault();
-          submit();
-        }
-      } else if (e.key === 'ArrowUp') {
-        const lineCount = getLineCount(e.currentTarget as HTMLDivElement);
-        if (lineCount <= 1) {
-          setChatHistory((old) => ({ ...old, open: true }));
-        }
-      }
-    },
-    [submit, setChatHistory, isComposing]
-  );
-
   const onHistoryClick = useCallback((content: string) => {
     if (ref.current) {
       setValue(content);
     }
   }, []);
 
-  function handleKeyCommand(command: any, editorState: any) {
+  /***
+   *  processes rich utils commands
+   */
+  function handleKeyCommand(command: any, editorState: EditorState) {
     const newState = RichUtils.handleKeyCommand(editorState, command);
 
+    if (command === 'upKey') {
+      // get current line
+      const currentBlockKey = editorState.getSelection().getStartKey();
+      const currentBlockIndex = editorState
+        .getCurrentContent()
+        .getBlockMap()
+        .keySeq()
+        .findIndex((k) => k === currentBlockKey);
+
+      if (currentBlockIndex === 0) {
+        setChatHistory((old) => ({ ...old, open: true }));
+        return 'handled';
+      }
+      return 'not-handled';
+    }
     if (newState) {
-      this.onChange(newState);
+      setEditorState(newState);
+      return 'handled';
+    }
+
+    return 'not-handled';
+  }
+
+  /***
+   * DraftJS - Enables META-Uparrow to open chat history
+   * Replaces previous behavior of clicking up when on top line as it would interfere with mentions.
+   */
+  function myKeyBindingFn(e: KeyboardEvent) {
+    if (e.code == 'ArrowUp' && e.metaKey) {
+      return 'upKey';
+    }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      return undefined;
+    }
+
+    return getDefaultKeyBinding(e);
+  }
+  /**
+   * DraftJS - processes "Return" utils commands
+   * */
+  function handleReturnCommand(command: any, editorState: any) {
+    const newState = RichUtils.handleKeyCommand(editorState, command);
+
+    // When pure enter, submit
+    if (
+      !mentionOpen &&
+      command.ctrlKey == false &&
+      command.metaKey == false &&
+      command.shiftKey == false &&
+      command.altKey == false
+    ) {
+      const emptyState = EditorState.push(
+        editorState,
+        ContentState.createFromText(''),
+        'remove-range'
+      );
+
+      setEditorState(emptyState);
+      submit();
+      return 'handled';
+    }
+
+    if (newState) {
+      setEditorState(newState);
       return 'handled';
     }
 
@@ -181,6 +234,17 @@ const Input = ({ onSubmit, onReply }: Props) => {
 
   return (
     <div className={editorCss.editor}>
+      <MentionSuggestions
+        open={mentionOpen}
+        onOpenChange={onOpenChange}
+        suggestions={suggestions}
+        onSearchChange={onSearchChange}
+        entryComponent={MentionEntry}
+        popoverContainer={({ children }) => <div>{children}</div>}
+        onAddMention={() => {
+          // get the mention object selected
+        }}
+      />
       <Stack direction="row" spacing={1}>
         <div>
           {chatSettings.inputs.length > 0 && (
@@ -206,23 +270,14 @@ const Input = ({ onSubmit, onReply }: Props) => {
           <Editor
             onFocus={handleCompositionStart} // tb if this is the idea
             onBlur={handleCompositionEnd}
-            customStyleMap={customStyleMap}
+            // customStyleMap={customStyleMap}
             editorState={editorState}
             placeholder="Type your message here..."
             handleKeyCommand={handleKeyCommand}
+            handleReturn={handleReturnCommand}
+            keyBindingFn={myKeyBindingFn}
             plugins={plugins}
             onChange={setEditorState}
-          />
-          <MentionSuggestions
-            open={mentionOpen}
-            onOpenChange={onOpenChange}
-            suggestions={suggestions}
-            onSearchChange={onSearchChange}
-            entryComponent={MentionEntry}
-            // popoverContainer={({ children }) => <div>{children}</div>}
-            onAddMention={() => {
-              // get the mention object selected
-            }}
           />
         </div>
 
