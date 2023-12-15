@@ -365,6 +365,17 @@ async def get_logo(theme: Optional[Theme] = Query(Theme.light)):
     return FileResponse(logo_path, media_type=media_type)
 
 
+@app.get("/mentions")
+async def get_mentions(request: Request):
+    """Get all the members of a project."""
+
+    db_client = await get_db_client_from_request(request)
+    res = await db_client.get_project_members()
+    
+    return JSONResponse(content=res)
+
+
+
 def register_wildcard_route_handler():
     @app.get("/{path:path}")
     async def serve(request: Request, path: str):

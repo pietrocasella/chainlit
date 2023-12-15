@@ -57,5 +57,25 @@ model Message {
   parentId       String?
 
   // Sqlite does not support JSON
-  prompt String?
+  prompt         String?
+  MessageMention MessageMention[]
+}
+
+model Mention {
+  id             Int              @id @default(autoincrement())
+  createdAt      DateTime         @default(now())
+  title          String
+  description    String
+  url            String
+  type           String
+  isCommand      Boolean          @default(false)
+  MessageMention MessageMention[]
+}
+
+model MessageMention {
+  id        Int     @id @default(autoincrement())
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  mentions  Mention @relation(fields: [mentionId], references: [id], onDelete: Cascade)
+  mentionId Int
 }
